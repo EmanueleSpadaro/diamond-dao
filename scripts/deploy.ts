@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { FacetCutAction, getSelectors } from "./libraries/diamond";
+import { FacetCutAction, getSelectors, DaoConstructorArgs } from "./libraries/diamond";
 
 export async function deployDiamond() {
   const accounts = await ethers.getSigners()
@@ -12,8 +12,16 @@ export async function deployDiamond() {
   console.log('DiamondCutFacet deployed:', await diamondCutFacet.getAddress())
 
   // deploy Diamond
+  const daoConstructorArgs: DaoConstructorArgs = {
+    owner: accounts[1].address,
+    realm: "dao",
+    name: "Paolo Borsellino",
+    firstlifePlaceID: "idididid",
+    description_cid: "just dont get in it",
+    isInviteOnly: false
+  }
   const Diamond = await ethers.getContractFactory('Diamond')
-  const diamond = await Diamond.deploy(contractOwner.address, await diamondCutFacet.getAddress())
+  const diamond = await Diamond.deploy(contractOwner.address, await diamondCutFacet.getAddress(), daoConstructorArgs)
   await diamond.waitForDeployment()
   console.log('Diamond deployed:', await diamond.getAddress())
 
@@ -30,7 +38,8 @@ export async function deployDiamond() {
   console.log('Deploying facets')
   const FacetNames = [
     'DiamondLoupeFacet',
-    'OwnershipFacet'
+    'OwnershipFacet',
+    'DaoFacet'
   ]
   const cut = []
   for (const FacetName of FacetNames) {

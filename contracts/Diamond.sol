@@ -9,11 +9,19 @@ pragma solidity ^0.8.18;
 /******************************************************************************/
 
 import { LibDiamond } from "./libraries/LibDiamond.sol";
+import { LibDao } from "./libraries/LibDao.sol";
 import { IDiamondCut } from "./interfaces/IDiamondCut.sol";
 
 contract Diamond {    
+    constructor(address _contractOwner, address _diamondCutFacet,
+                LibDao.DaoConstructorArgs memory args) payable {
 
-    constructor(address _contractOwner, address _diamondCutFacet) payable {        
+        // Initialize the Diamond DAO with the given arguments (owner, firstlife stuff, ...)
+        LibDao.initDao(args);
+        
+
+
+        //Diamond stuff below
         LibDiamond.setContractOwner(_contractOwner);
 
         // Add the diamondCut external function from the diamondCutFacet
@@ -25,7 +33,7 @@ contract Diamond {
             action: IDiamondCut.FacetCutAction.Add, 
             functionSelectors: functionSelectors
         });
-        LibDiamond.diamondCut(cut, address(0), "");        
+        LibDiamond.diamondCut(cut, address(0), "");    
     }
 
     // Find facet for function that is called and execute the

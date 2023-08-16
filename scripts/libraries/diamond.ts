@@ -4,6 +4,7 @@ import {
 	ContractFactory,
 	FunctionFragment,
 	ethers,
+	
 } from "ethers";
 
 type Facets = { facetAddress: string; functionSelectors: string[] }[];
@@ -118,4 +119,13 @@ export function findAddressPositionInFacets(
 	}
 
 	throw new Error("None number found");
+}
+
+export interface DaoConstructorArgs {
+	owner: string,
+	realm: string,
+	name: string,
+	firstlifePlaceID: string,
+	description_cid: string,
+	isInviteOnly: boolean
 }
