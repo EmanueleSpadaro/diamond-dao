@@ -4,6 +4,10 @@ pragma solidity ^0.8.18;
 library LibDao {
     bytes32 constant DAO_STORAGE_POSITION = keccak256("eu.commonshood.dao.storage");
 
+    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 constant OWNER_ROLE = keccak256('OWNER_ROLE');
+    bytes32 constant USER_ROLE = keccak256('USER_ROLE');
+
     struct DaoStorage {
         address owner;
         string realm;
@@ -11,6 +15,11 @@ library LibDao {
         string firstlifePlaceID;
         string description_cid;
         bool isInviteOnly;
+        mapping (address => bytes32) usersRole;
+        mapping (bytes32 => address[]) roleUsers;
+        mapping (bytes32 => bytes32) roleHierarchy;
+        mapping(address => bytes32) invites;
+        mapping(address => bytes32) promotions;
     }
 
     
@@ -53,5 +62,9 @@ library LibDao {
         ds.firstlifePlaceID = _args.firstlifePlaceID;
         ds.description_cid = _args.description_cid;
         ds.isInviteOnly = _args.isInviteOnly;
+
+        ds.usersRole[_args.owner] = OWNER_ROLE;
+        //USER < OWNER
+        ds.roleHierarchy[USER_ROLE] = OWNER_ROLE;
     }
 }
