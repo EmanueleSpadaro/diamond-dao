@@ -15,6 +15,7 @@ import { Contract } from "ethers";
 
 import { expect } from "chai";
 import { it } from "mocha";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("DiamondTest", async function () {
 	let diamondAddress: string;
@@ -67,11 +68,11 @@ describe("DiamondTest", async function () {
 		assert.equal(addresses.length, 4);
 	});
 
-	it('Example Dao parameters are correctly set in Smart Contract Storage', async () => {
+	it('Owner correctness', async () => {
 		const acc = await ethers.getSigners()
 		
 		const daoConstructorArgs: DaoConstructorArgs = {
-			owner: acc[0].address,
+			owner: acc[1].address,
 			realm: "dao",
 			name: "Paolo Borsellino",
 			firstlifePlaceID: "idididid",
@@ -89,11 +90,12 @@ describe("DiamondTest", async function () {
 		//assert.sameMembers(await daoFacet.getRoleHierarchy(), expectedHierarchy, "Default hierarchy does not comply with specs");
 	})
 	it('Hierarchy Test (USER < SUPERVISOR < ADMIN < OWNER)', async () => {
+		const acc = await ethers.getSigners()
 		const expectedHierarchy = [roles.User, roles.Supervisor, roles.Admin, roles.Owner];
-		//await daoFacet.connect(daoOwner).addRole();
-		//FIXME: cannot call from other signers with .connect on Contract
-		await daoFacet.addRole(roles.Admin, roles.Owner, (await ethers.getSigners())[1]);
-		await daoFacet.addRole(roles.Supervisor, roles.Admin, (await ethers.getSigners())[1]);
+		//FIXME: this is an horrendous way of connecting as a different signer than default to a smart contract call
+		const owner_DaoFacet = await daoFacet.connect(acc[1]) as Contract;
+		await owner_DaoFacet.addRole(roles.Admin, roles.Owner);
+		await owner_DaoFacet.addRole(roles.Supervisor, roles.Admin);
 		const daoHierarchy = await daoFacet.getRoleHierarchy();
 		assert.sameOrderedMembers(daoHierarchy, expectedHierarchy);
 	})

@@ -13,7 +13,7 @@ export async function deployDiamond() {
 
   // deploy Diamond
   const daoConstructorArgs: DaoConstructorArgs = {
-    owner: accounts[0].address,
+    owner: accounts[1].address,
     realm: "dao",
     name: "Paolo Borsellino",
     firstlifePlaceID: "idididid",
