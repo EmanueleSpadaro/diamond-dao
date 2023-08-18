@@ -17,6 +17,10 @@ import { expect } from "chai";
 import { it } from "mocha";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
+function contractAs(contract: Contract, asUser: HardhatEthersSigner) {
+	return contract.connect(asUser) as Contract;
+}
+
 describe("DiamondTest", async function () {
 	let diamondAddress: string;
 	let diamondCutFacet: Contract;
@@ -92,10 +96,9 @@ describe("DiamondTest", async function () {
 	it('Hierarchy Test (USER < SUPERVISOR < ADMIN < OWNER)', async () => {
 		const acc = await ethers.getSigners()
 		const expectedHierarchy = [roles.User, roles.Supervisor, roles.Admin, roles.Owner];
-		//FIXME: this is an horrendous way of connecting as a different signer than default to a smart contract call
-		const owner_DaoFacet = await daoFacet.connect(acc[1]) as Contract;
-		await owner_DaoFacet.addRole(roles.Admin, roles.Owner);
-		await owner_DaoFacet.addRole(roles.Supervisor, roles.Admin);
+		const byOwner = contractAs(daoFacet, acc[1]);
+		await byOwner.addRole(roles.Admin, roles.Owner);
+		await byOwner.addRole(roles.Supervisor, roles.Admin);
 		const daoHierarchy = await daoFacet.getRoleHierarchy();
 		assert.sameOrderedMembers(daoHierarchy, expectedHierarchy);
 	})
