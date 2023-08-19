@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.18;
 
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibDao} from "../libraries/LibDao.sol";
 
 contract DaoFacet {
+    using EnumerableSet for EnumerableSet.UintSet;
     //Modifier that allows to execute the code only if the caller IS a member
     modifier isMember(address addr) {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
@@ -40,7 +42,6 @@ contract DaoFacet {
 
     //Modifier that allows to execute the code only if the caller is hierarchically superior in terms of rank
     modifier isAdminOf(address ofAddress) {
-        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         require(
             isAdminOfRole(msg.sender, getRole(ofAddress)),
             "you're required to be of higher rank"
@@ -62,11 +63,14 @@ contract DaoFacet {
         _;
     }
 
-    //TODO: move this logic in an abstract contract implementable named like IPermissableFacet
-    // modifier hasPermission(DaoPermission permission) {
-    //     require(rolePermissions[users[msg.sender].role].permissions.contains(uint256(permission)), "not enough permissions");
-    //     _;
-    // }
+    modifier hasPermission(LibDao.DaoPermission perm) {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        require(
+            ds.rolePermissions[getRole(msg.sender)].permissions.contains(uint256(perm)),
+            "not-enough-permissions"
+        );
+        _;
+    }
 
     //TODO: move this logic into a DaoTokenFacet contract
     // modifier canManageToken(string memory tokenSymbol) {
@@ -137,8 +141,13 @@ contract DaoFacet {
 
     //TODO: invite_switch shall be implemented in some way (maybe hasPermission(daoFacetContextAddress, permission_enum_int))
     //Alters the DAO Invite-Only flag
-    function setInviteOnly(bool newValue) external isMember(msg.sender) {
-        //hasPermission(DaoPermission.invite_switch) {
+    function setInviteOnly(
+        bool newValue
+    )
+        external
+        isMember(msg.sender)
+        hasPermission(LibDao.DaoPermission.invite_switch)
+    {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         require(
             ds.isInviteOnly != newValue,
@@ -255,6 +264,32 @@ contract DaoFacet {
         return ds.usersRole[account];
     }
 
+    function _grantRole(bytes32 role, address account) internal {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        ds.usersRole[account] = role;
+    }
+
+    function _revokeRole(address account) internal {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        delete ds.usersRole[account];
+    }
+
+    function _grantPermission(
+        LibDao.DaoPermission perm,
+        bytes32 toRole
+    ) internal {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        ds.rolePermissions[toRole].permissions.add(uint256(perm));
+    }
+
+    function _revokePermission(
+        LibDao.DaoPermission perm,
+        bytes32 toRole
+    ) internal {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        ds.rolePermissions[toRole].permissions.remove(uint256(perm));
+    }
+
     //TODO: associate or atleast throw an event with the friendly name string of the rank?
     function addRole(
         bytes32 newRole,
@@ -323,17 +358,6 @@ contract DaoFacet {
             "target account does not have to-be-revoked role"
         );
         _revokeRole(account);
-    }
-
-    function _grantRole(bytes32 role, address account) internal {
-        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
-        ds.usersRole[account] = role;
-    }
-
-    function _revokeRole(address account) internal {
-        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
-        //TODO: shall we implement a role revoke, grant, ...,  event subscription?
-        delete ds.usersRole[account];
     }
 
     function getRoleAdmin(bytes32 role) internal view returns (bytes32) {
@@ -417,17 +441,18 @@ contract DaoFacet {
     function getRolesCount() internal view returns (uint) {
         uint count = 0;
         bytes32 role = LibDao.USER_ROLE;
-        while(role != LibDao.DEFAULT_ADMIN_ROLE) {
+        while (role != LibDao.DEFAULT_ADMIN_ROLE) {
             role = getRoleAdmin(role);
             count++;
         }
         return count;
     }
+
     function getRoleHierarchy() external view returns (bytes32[] memory) {
         bytes32[] memory rolesArr = new bytes32[](getRolesCount());
         bytes32 role = LibDao.USER_ROLE;
         uint i = 0;
-        while(role != LibDao.DEFAULT_ADMIN_ROLE) {
+        while (role != LibDao.DEFAULT_ADMIN_ROLE) {
             rolesArr[i++] = role;
             role = getRoleAdmin(role);
         }
