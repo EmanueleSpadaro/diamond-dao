@@ -3,8 +3,10 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibDao} from "../libraries/LibDao.sol";
+import {IDao} from "../interfaces/IDao.sol";
+import {DaoPermissable} from "./DaoPermissable.sol";
 
-contract DaoFacet {
+contract DaoFacet is IDao, DaoPermissable {
     using EnumerableSet for EnumerableSet.UintSet;
     //Modifier that allows to execute the code only if the caller IS a member
     modifier isMember(address addr) {
@@ -43,7 +45,7 @@ contract DaoFacet {
     //Modifier that allows to execute the code only if the caller is hierarchically superior in terms of rank
     modifier isAdminOf(address ofAddress) {
         require(
-            isAdminOfRole(msg.sender, getRole(ofAddress)),
+            isAdminOfRole(msg.sender, _getRole(ofAddress)),
             "you're required to be of higher rank"
         );
         _;
@@ -59,16 +61,7 @@ contract DaoFacet {
     }
 
     modifier onlyRole(bytes32 role) {
-        require(getRole(msg.sender) == role, "role not allowed");
-        _;
-    }
-
-    modifier hasPermission(LibDao.DaoPermission perm) {
-        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
-        require(
-            ds.rolePermissions[getRole(msg.sender)].permissions.contains(uint256(perm)),
-            "not-enough-permissions"
-        );
+        require(_getRole(msg.sender) == role, "role not allowed");
         _;
     }
 
@@ -123,7 +116,7 @@ contract DaoFacet {
         address isAdmin,
         bytes32 ofRole
     ) internal view returns (bool) {
-        return isAdminOfRole(getRole(isAdmin), ofRole);
+        return isAdminOfRole(_getRole(isAdmin), ofRole);
     }
 
     //Joins the DAO
@@ -146,7 +139,7 @@ contract DaoFacet {
     )
         external
         isMember(msg.sender)
-        hasPermission(LibDao.DaoPermission.invite_switch)
+        onlyPermitted(LibDao.DaoPermission.invite_switch)
     {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         require(
@@ -202,7 +195,7 @@ contract DaoFacet {
         bytes32 newRole
     ) internal isMember(toModify) isAdminOf(toModify) onlyAdmins(newRole) {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
-        bool isPromotion = isAdminOfRole(newRole, getRole(toModify));
+        bool isPromotion = isAdminOfRole(newRole, _getRole(toModify));
         //If there's a pending promotion, we delete it whether it's a promotion or not
         delete ds.promotions[toModify];
         //If it's a promotion, there is a 2Phase (offer && accept/refuse)
@@ -222,7 +215,7 @@ contract DaoFacet {
     function acceptPromotion() external isMember(msg.sender) hasPromotion {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         _revokeRole(msg.sender);
-        _grantRole(getRole(msg.sender), msg.sender);
+        _grantRole(ds.promotions[msg.sender], msg.sender);
         delete ds.promotions[msg.sender];
         //TODO: event emission
         // emit UserPromoted(msg.sender, users[msg.sender].role);
@@ -259,7 +252,11 @@ contract DaoFacet {
     }
 
     //Returns the provided address' role
-    function getRole(address account) public view returns (bytes32) {
+    function getRole(address account) external view returns (bytes32) {
+        return _getRole(account);
+    }
+
+    function _getRole(address account) internal view returns (bytes32) {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         return ds.usersRole[account];
     }
@@ -354,7 +351,7 @@ contract DaoFacet {
         address account
     ) external onlyAdmins(role) isAdminOf(account) isLegitRole(role) {
         require(
-            getRole(account) == role,
+            _getRole(account) == role,
             "target account does not have to-be-revoked role"
         );
         _revokeRole(account);
@@ -457,5 +454,16 @@ contract DaoFacet {
             role = getRoleAdmin(role);
         }
         return rolesArr;
+    }
+
+    function hasPermission(
+        address account,
+        LibDao.DaoPermission perm
+    ) external view returns (bool) {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        return
+            ds.rolePermissions[_getRole(account)].permissions.contains(
+                uint256(perm)
+            );
     }
 }
