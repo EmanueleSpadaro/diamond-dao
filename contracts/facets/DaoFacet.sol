@@ -275,6 +275,7 @@ contract DaoFacet is IDao, DaoPermissable {
         LibDao.DaoPermission perm,
         bytes32 toRole
     ) internal {
+        require(uint(perm) < uint(LibDao.DaoPermission.COUNT));
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         ds.rolePermissions[toRole].permissions.add(uint256(perm));
     }
@@ -283,6 +284,7 @@ contract DaoFacet is IDao, DaoPermissable {
         LibDao.DaoPermission perm,
         bytes32 toRole
     ) internal {
+        require(uint(perm) < uint(LibDao.DaoPermission.COUNT));
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         ds.rolePermissions[toRole].permissions.remove(uint256(perm));
     }
