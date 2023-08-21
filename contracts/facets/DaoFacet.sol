@@ -292,8 +292,13 @@ contract DaoFacet is IDao, DaoPermissable {
     //TODO: associate or atleast throw an event with the friendly name string of the rank?
     function addRole(
         bytes32 newRole,
-        bytes32 adminRole
+        bytes32 adminRole,
+        LibDao.DaoPermission[] calldata perms
     ) external onlyRole(LibDao.OWNER_ROLE) isLegitRole(adminRole) {
+        require(
+            perms.length <= uint(LibDao.DaoPermission.COUNT),
+            "given permissions exceed the amount of permissions available"
+        );
         require(!_isLegitRole(newRole), "already existing role");
         require(
             adminRole != LibDao.USER_ROLE,
@@ -311,6 +316,10 @@ contract DaoFacet is IDao, DaoPermissable {
         _setRoleAdmin(newRole, adminRole);
         //We went from Role -> AdminRole to
         //Role -> NewRole -> AdminRole
+
+        //We now add the given permissions
+        for(uint i = 0; i < perms.length; i++)
+            _grantPermission(perms[i], newRole);
     }
 
     function removeRole(
@@ -456,6 +465,10 @@ contract DaoFacet is IDao, DaoPermissable {
             role = getRoleAdmin(role);
         }
         return rolesArr;
+    }
+
+    function getPermissionsCount() external pure returns (uint) {
+        return uint(LibDao.DaoPermission.COUNT);
     }
 
     function hasPermission(

@@ -7,6 +7,9 @@ import {
 	findAddressPositionInFacets,
 	DaoConstructorArgs,
 } from "../scripts/libraries/diamond";
+import {
+	DaoPermission
+} from "../scripts/libraries/daoPermission";
 import { deployDiamond } from "../scripts/deploy";
 import { assert } from "chai";
 
@@ -19,6 +22,29 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 function contractAs(contract: Contract, asUser: HardhatEthersSigner) {
 	return contract.connect(asUser) as Contract;
+}
+
+function range(start: number, stop?: number, step?: number): number[] {
+    if (typeof stop === 'undefined') {
+        // one param defined
+        stop = start;
+        start = 0;
+    }
+
+    if (typeof step === 'undefined') {
+        step = 1;
+    }
+
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+
+    const result: number[] = [];
+    for (let i = start; (step > 0 ? i < stop : i > stop); i += step) {
+        result.push(i);
+    }
+
+    return result;
 }
 
 describe("DiamondTest", async function () {
@@ -40,6 +66,16 @@ describe("DiamondTest", async function () {
 	let supervisor: HardhatEthersSigner;
 	let user: HardhatEthersSigner;
 	let moderator: HardhatEthersSigner;
+	const supervisorPermissions: DaoPermission[] = [
+		DaoPermission.token_transfer,
+		DaoPermission.token_canmanage,
+		DaoPermission.crowd_join,
+		DaoPermission.crowd_refund,
+		DaoPermission.crowd_canmanage,
+		DaoPermission.exchange_accept,
+		DaoPermission.exchange_refill,
+		DaoPermission.exchange_canmanage
+	];
 
 
 
@@ -83,6 +119,9 @@ describe("DiamondTest", async function () {
 		//console.log({ addresses });
 		assert.equal(addresses.length, 7);
 	});
+	it("expected amount of permissions available", async () => {
+		assert.equal(await daoFacet.getPermissionsCount(), DaoPermission.COUNT);
+	})
 
 	it('Owner correctness', async () => {
 		const acc = await ethers.getSigners()
@@ -109,8 +148,8 @@ describe("DiamondTest", async function () {
 		const acc = await ethers.getSigners()
 		const expectedHierarchy = [roles.User, roles.Supervisor, roles.Admin, roles.Owner];
 		const byOwner = contractAs(daoFacet, acc[1]);
-		await byOwner.addRole(roles.Admin, roles.Owner);
-		await byOwner.addRole(roles.Supervisor, roles.Admin);
+		await byOwner.addRole(roles.Admin, roles.Owner, range(0, await daoFacet.getPermissionsCount()));
+		await byOwner.addRole(roles.Supervisor, roles.Admin, supervisorPermissions);
 		const daoHierarchy = await daoFacet.getRoleHierarchy();
 		assert.sameOrderedMembers(daoHierarchy, expectedHierarchy);
 	})
