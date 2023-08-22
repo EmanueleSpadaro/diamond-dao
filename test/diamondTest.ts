@@ -68,6 +68,7 @@ describe("DiamondTest", async function () {
 	let user: HardhatEthersSigner;
 	let moderator: HardhatEthersSigner;
 	let recipientUser: HardhatEthersSigner;
+	let crowdsaleID: HardhatEthersSigner; //FIXME: This MUST be an actual crowdsale address
 	const supervisorPermissions: DaoPermission[] = [
 		DaoPermission.token_specific,
 		DaoPermission.token_transfer,
@@ -112,7 +113,7 @@ describe("DiamondTest", async function () {
 		daoCrowdsaleFacet = await ethers.getContractAt("DaoCrowdsaleFacet", diamondAddress);
 		daoExchangeFacet = await ethers.getContractAt("DaoExchangeFacet", diamondAddress);
 		const signers = await ethers.getSigners();
-		[factoryOwner, owner, admin, supervisor, user, moderator, recipientUser] = await ethers.getSigners();
+		[factoryOwner, owner, admin, supervisor, user, moderator, recipientUser, crowdsaleID] = await ethers.getSigners();
 	});
 
 	it("expected facets number -- call to facetAddresses function", async () => {
@@ -308,34 +309,111 @@ describe("DiamondTest", async function () {
 			})
 		})
 		describe("Crowdsale Creation", () => {
+			//TODO: similiarly to test/tokens.ts, we might want to implement an interface for Crowdsales
 			it("Owner can create a Crowdsale", async () => {
-				await contractAs(daoCrowdsaleFacet, owner).createCrowdsale();
-				await expect(contractAs(daoCrowdsaleFacet, user).createCrowdsale()).to.be.reverted;
-				// const daoInstance = await getUserDao(owner);
-				// await daoInstance.createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash");
+				await contractAs(daoCrowdsaleFacet, owner).createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash");
 			})
-			// it("Admin can create a Crowdsale", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     await daoInstance.createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash", {from:admin});
-			// })
-			// it("Supervisor can't create a Crowdsale", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         await daoInstance.createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash", {from:supervisor});
-			//     }catch(_){
-			//         return true;
-			//     }
-			//     throw new Error("Supervisor shouldn't be able to create a crowdsale");
-			// })
-			// it("User can't create a Crowdsale", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         await daoInstance.createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash", {from:user});
-			//     }catch(_){
-			//         return true;
-			//     }
-			//     throw new Error("User shouldn't be able to create a crowdsale");
-			// })
+			it("Admin can create a Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, admin).createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash");
+			})
+			it("Supervisor can't create a Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, supervisor).createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash")).to.reverted;
+			})
+			it("User can't create a Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).createCrowdsale(user, user, 0, 0, 0, 0, 0, "desc", "desc", "logo_hash", "tos_hash")).to.reverted;
+			})
+		})
+		describe("Crowdsale Unlock", () => {
+			it("Owner can unlock Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, owner).unlockCrowdsale(user, user, 0);
+			})
+			it("Admin can unlock Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, admin).unlockCrowdsale(user, user, 0);
+			})
+			it("Supervisor cannot unlock Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, supervisor).unlockCrowdsale(user, user, 0)).to.be.reverted;
+			})
+			it("User cannot unlock Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).unlockCrowdsale(user, user, 0)).to.be.reverted;
+			})
+		})
+		describe("Crowdsale Stop", () => {
+			it("Owner can stop Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, owner).stopCrowdsale(user);
+			})
+			it("Admin can stop Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, admin).stopCrowdsale(user);
+			})
+			it("Supervisor cannot stop Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, supervisor).stopCrowdsale(user)).to.be.reverted;
+			})
+			it("User cannot stop Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).stopCrowdsale(user)).to.be.reverted;
+			})
+		})
+		describe("Crowdsale Join", () => {
+			it("Owner can join Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, owner).joinCrowdsale(user, 0, ownerToken.symbol);
+			})
+			it("Admin can join Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, admin).joinCrowdsale(user, 0, ownerToken.symbol);
+			})
+			//FIXME: Shall the supervisor actually be able to join or not crowdsales? Previous tests stated we'll eventually have to change this when we'll implemented commonshood logic 
+			it("Supervisor can join Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, supervisor).joinCrowdsale(user, 0, ownerToken.symbol);
+				//try{
+				//    await daoInstance.joinCrowdsale(user, 0, ownerToken.symbol, {from:supervisor});
+				//}catch(_){
+				//    return true;
+				//}
+				//throw new Error("Supervisor shouldn't be able to join a Crowdsale");
+			})
+			it("User cannot join Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).joinCrowdsale(user, 0, ownerToken.symbol)).to.be.reverted;
+			})
+		})
+		describe("Crowdsale Refund", () => {
+			it("Owner can refund Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, owner).refundMeCrowdsale(user, 0);
+			})
+			it("Admin can refund Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, admin).refundMeCrowdsale(user, 0);
+			})
+			//FIXME: Shall the supervisor actually be able to join or not crowdsales? Previous tests stated we'll eventually have to change this when we'll implemented commonshood logic
+			it("Supervisor can refund Crowdsale", async () => {
+				await contractAs(daoCrowdsaleFacet, supervisor).refundMeCrowdsale(user, 0);
+			})
+			it("User cannot refund Crowdsale", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).refundMeCrowdsale(user, 0)).to.be.reverted;
+			})
+		})
+		describe("Crowdsale Permissions Grant/Revoke", () => {
+			
+			it("Owner grants/revokes to Supervisor", async () => {
+				assert.equal(await contractAs(daoCrowdsaleFacet, owner).getCrowdsaleManagement(crowdsaleID, supervisor), false, "Supervisor shouldn't have permissions for given crowdsale before assignment");
+				await contractAs(daoCrowdsaleFacet, owner).makeAdminCrowdsale(crowdsaleID, supervisor);
+				assert.equal(await contractAs(daoCrowdsaleFacet, owner).getCrowdsaleManagement(crowdsaleID, supervisor), true, "Supervisor should have now permissions for given crowdsale");
+				await contractAs(daoCrowdsaleFacet, owner).removeAdminCrowdsale(crowdsaleID, supervisor);
+				assert.equal(await contractAs(daoCrowdsaleFacet, owner).getCrowdsaleManagement(crowdsaleID, supervisor), false, "Supervisor shouldn't have permissions for given crowdsale");
+			})
+			it("Admin grants/revokes to Supervisor", async () => {
+				assert.equal(await contractAs(daoCrowdsaleFacet, admin).getCrowdsaleManagement(crowdsaleID, supervisor), false, "Supervisor shouldn't have permissions for given crowdsale before assignment");
+				await contractAs(daoCrowdsaleFacet, admin).makeAdminCrowdsale(crowdsaleID, supervisor);
+				assert.equal(await contractAs(daoCrowdsaleFacet, admin).getCrowdsaleManagement(crowdsaleID, supervisor), true, "Supervisor should have now permissions for given crowdsale");
+				await contractAs(daoCrowdsaleFacet, admin).removeAdminCrowdsale(crowdsaleID, supervisor);
+				assert.equal(await contractAs(daoCrowdsaleFacet, admin).getCrowdsaleManagement(crowdsaleID, supervisor), false, "Supervisor shouldn't have permissions for given crowdsale");
+			})
+			it("Supervisor cannot grant/revoke", async () => {
+				assert.equal(await daoCrowdsaleFacet.getCrowdsaleManagement(crowdsaleID, user), false);
+				await expect(contractAs(daoCrowdsaleFacet, supervisor).makeAdminCrowdsale(crowdsaleID, user)).to.be.reverted;
+				assert.equal(await daoCrowdsaleFacet.getCrowdsaleManagement(crowdsaleID, user), false);
+			})
+			it("User cannot grant/revoke", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, user).makeAdminCrowdsale(crowdsaleID, supervisor)).to.be.reverted;
+			})
+			it("User cannot receive crowdsale permissions", async () => {
+				await expect(contractAs(daoCrowdsaleFacet, owner).makeAdminCrowdsale(crowdsaleID, user)).to.be.reverted;
+			})
 		})
 		describe("Exchange Create", () => {
 			// const coinsOffered = [];
