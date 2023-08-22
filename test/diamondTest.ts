@@ -19,32 +19,33 @@ import { Contract, EnsPlugin } from "ethers";
 import { expect } from "chai";
 import { it } from "mocha";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { ownerToken, adminToken, notCreatableToken } from "./tokens";
 
 function contractAs(contract: Contract, asUser: HardhatEthersSigner) {
 	return contract.connect(asUser) as Contract;
 }
 
 function range(start: number, stop?: number, step?: number): number[] {
-    if (typeof stop === 'undefined') {
-        // one param defined
-        stop = start;
-        start = 0;
-    }
+	if (typeof stop === 'undefined') {
+		// one param defined
+		stop = start;
+		start = 0;
+	}
 
-    if (typeof step === 'undefined') {
-        step = 1;
-    }
+	if (typeof step === 'undefined') {
+		step = 1;
+	}
 
-    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
-        return [];
-    }
+	if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+		return [];
+	}
 
-    const result: number[] = [];
-    for (let i = start; (step > 0 ? i < stop : i > stop); i += step) {
-        result.push(i);
-    }
+	const result: number[] = [];
+	for (let i = start; (step > 0 ? i < stop : i > stop); i += step) {
+		result.push(i);
+	}
 
-    return result;
+	return result;
 }
 
 describe("DiamondTest", async function () {
@@ -66,7 +67,9 @@ describe("DiamondTest", async function () {
 	let supervisor: HardhatEthersSigner;
 	let user: HardhatEthersSigner;
 	let moderator: HardhatEthersSigner;
+	let recipientUser: HardhatEthersSigner;
 	const supervisorPermissions: DaoPermission[] = [
+		DaoPermission.token_specific,
 		DaoPermission.token_transfer,
 		DaoPermission.token_canmanage,
 		DaoPermission.crowd_join,
@@ -109,7 +112,7 @@ describe("DiamondTest", async function () {
 		daoCrowdsaleFacet = await ethers.getContractAt("DaoCrowdsaleFacet", diamondAddress);
 		daoExchangeFacet = await ethers.getContractAt("DaoExchangeFacet", diamondAddress);
 		const signers = await ethers.getSigners();
-		[factoryOwner, owner, admin, supervisor, user, moderator] = await ethers.getSigners();
+		[factoryOwner, owner, admin, supervisor, user, moderator, recipientUser] = await ethers.getSigners();
 	});
 
 	it("expected facets number -- call to facetAddresses function", async () => {
@@ -228,49 +231,81 @@ describe("DiamondTest", async function () {
 	describe('Role based micro-permissions', () => {
 		describe('Token Create', () => {
 			it("Owner can create a Token", async () => {
-				await contractAs(daoTokenFacet, owner).createToken();
-				await expect(contractAs(daoTokenFacet, user).createToken()).to.be.reverted;
-				// const daoInstance = await getUserDao(owner);
-				// try{
-				//     const {name, symbol, decimals, logoURL, logoHash, hardCap, contractHash} = ownerToken;
-				//     await daoInstance.createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash, {from: owner})
-				// }catch(_){
-				//     throw new Error("Owner should be able to create a token");
-				// }
-				// return true;
+				const { name, symbol, decimals, logoURL, logoHash, hardCap, contractHash } = ownerToken;
+				await contractAs(daoTokenFacet, owner).createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash);
 			});
-			// it("Admin can create a Token", async () => {
+			it("Admin can create a Token", async () => {
+				const { name, symbol, decimals, logoURL, logoHash, hardCap, contractHash } = adminToken;
+				await contractAs(daoTokenFacet, admin).createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash);
+			});
+			it("Supervisor can't create a Token", async () => {
+				const { name, symbol, decimals, logoURL, logoHash, hardCap, contractHash } = notCreatableToken;
+				await expect(contractAs(daoTokenFacet, supervisor).createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash)).to.be.reverted;
+			});
+			it("User can't create a Token", async () => {
+				const { name, symbol, decimals, logoURL, logoHash, hardCap, contractHash } = notCreatableToken;
+				await expect(contractAs(daoTokenFacet, user).createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash)).to.be.reverted;
+			});
+		})
+		describe('Token Transfer', () => {
+			it("Owner can transfer token", async () => {
+				await contractAs(daoTokenFacet, owner).transferToken(ownerToken.symbol, 250, recipientUser);
+			})
+			it("Admin can transfer token", async () => {
+				await contractAs(daoTokenFacet, admin).transferToken(ownerToken.symbol, 250, recipientUser);
+			})
+			it("Supervisor without token auth can't transfer token", async () => {
+				await expect(contractAs(daoTokenFacet, supervisor).transferToken(ownerToken.symbol, 250, recipientUser)).to.be.reverted;
+			})
+			it("Admin authorizes Supervisor for Token", async () => {
+				await contractAs(daoTokenFacet, admin).setTokenAuth(ownerToken.symbol, supervisor);
+			})
+			it("Authorized Supervisor can transfer token", async () => {
+				await contractAs(daoTokenFacet, supervisor).transferToken(ownerToken.symbol, 250, recipientUser);
+			})
+		})
+		describe("Token Mint", () => {
+			it("Owner can mint token", async () => {
+				await contractAs(daoTokenFacet, owner).mintToken(ownerToken.symbol, 250);
+			})
+			it("Admin can mint token", async () => {
+				await contractAs(daoTokenFacet, admin).mintToken(ownerToken.symbol, 250);
+			})
+			it("Supervisor cannot mint token", async () => {
+				await expect(contractAs(daoTokenFacet, supervisor).mintToken(ownerToken.symbol, 250)).to.be.reverted;
+			})
+			it("User cannot mint token", async () => {
+				await expect(contractAs(daoTokenFacet, user).mintToken(ownerToken.symbol, 250)).to.be.reverted;
+			})
+		})
+		describe("Token Authorizations", () => {
+			it("Supervisor can't authorize himself", async () => {
+				await expect(contractAs(daoTokenFacet, supervisor).setTokenAuth(ownerToken.symbol, supervisor)).to.be.reverted;
+			})
+			//FIXME: getTokenAuth externally callable [https://discord.com/channels/730508054143172710/730508054877175911/1143574236603109487]
+			// it("Supervisor getTokenAuth consistence (true)", async () => {
 			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         const {name, symbol, decimals, logoURL, logoHash, hardCap, contractHash} = adminToken;
-			//         await daoInstance.createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash, {from:admin});
-			//     }catch(_){
-			//         throw new Error("Admin should be able to create a token");
-			//     }
-			//     return true;
-			// });
-			// it("Supervisor can't create a Token", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         const {name, symbol, decimals, logoURL, logoHash, hardCap, contractHash} = notCreatableToken;
-			//         await daoInstance.createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash, {from:supervisor});
-			//     }catch(_){
-			//         return true;
-
-			//     }
-			//     throw new Error("Supervisor shouldn't be able to create a token");
-			// });
-			// it("User can't create a Token", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         const {name, symbol, decimals, logoURL, logoHash, hardCap, contractHash} = notCreatableToken;
-			//         await daoInstance.createToken(name, symbol, decimals, logoURL, logoHash, hardCap, contractHash, {from:user});
-			//     }catch(_){
-			//         return true;
-
-			//     }
-			//     throw new Error("User shouldn't be able to create a token");
-			// });
+			//     assert.equal(
+			//         await daoInstance.getTokenAuth(ownerToken.symbol, supervisor),
+			//         true,
+			//         "Supervisor getTokenAuth not consistent with previous assignments"
+			//     );
+			// })
+			it("Admin reverts Supervisor authorization for Token", async () => {
+				await contractAs(daoTokenFacet, admin).removeTokenAuth(ownerToken.symbol, supervisor);
+				//FIXME: getTokenAuth externally callable [https://discord.com/channels/730508054143172710/730508054877175911/1143574236603109487]
+				// assert.equal(
+				//     await daoInstance.getTokenAuth(ownerToken.symbol, supervisor),
+				//     false,
+				//     "Supervisor shouldn't be consider authorized for a token after being unset by admin"
+				// )
+			})
+			it("User can't be authorized for tokens", async () => {
+				await expect(contractAs(daoTokenFacet, owner).setTokenAuth(ownerToken.symbol, user)).to.be.reverted;
+			})
+			it("Owner reapplies token Authorization for Supervisor", async () => {
+				await contractAs(daoTokenFacet, owner).setTokenAuth(ownerToken.symbol, supervisor);
+			})
 		})
 		describe("Crowdsale Creation", () => {
 			it("Owner can create a Crowdsale", async () => {
@@ -303,40 +338,40 @@ describe("DiamondTest", async function () {
 			// })
 		})
 		describe("Exchange Create", () => {
-            // const coinsOffered = [];
-            // const coinsRequired = [];
-            // const amountsOffered = [];
-            // const amountsRequired = [];
-            // const repeats = 0;
-            // const expiration = 0;
-            it("Owner can create a Exchange", async () => {
+			// const coinsOffered = [];
+			// const coinsRequired = [];
+			// const amountsOffered = [];
+			// const amountsRequired = [];
+			// const repeats = 0;
+			// const expiration = 0;
+			it("Owner can create a Exchange", async () => {
 				await contractAs(daoExchangeFacet, owner).createExchange();
 				await expect(contractAs(daoExchangeFacet, user).createExchange()).to.be.reverted;
-                // const daoInstance = await getUserDao(owner);
-                // await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:owner});
-            })
-            // it("Admin can create a Exchange", async () => {
-            //     const daoInstance = await getUserDao(owner);
-            //     await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:admin});
-            // })
-            // it("Supervisor cannot create a Exchange", async () => {
-            //     const daoInstance = await getUserDao(owner);
-            //     try{
-            //         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:supervisor});
-            //     }catch(_){
-            //         return true;
-            //     }
-            //     throw new Error("Supervisor shouldn't be able to create an exchange");
-            // })
-            // it("User cannot create a Exchange", async () => {
-            //     const daoInstance = await getUserDao(owner);
-            //     try{
-            //         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:user});
-            //     }catch(_){
-            //         return true;
-            //     }
-            //     throw new Error("User shouldn't be able to create an exchange");
-            // })
-        })
+				// const daoInstance = await getUserDao(owner);
+				// await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:owner});
+			})
+			// it("Admin can create a Exchange", async () => {
+			//     const daoInstance = await getUserDao(owner);
+			//     await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:admin});
+			// })
+			// it("Supervisor cannot create a Exchange", async () => {
+			//     const daoInstance = await getUserDao(owner);
+			//     try{
+			//         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:supervisor});
+			//     }catch(_){
+			//         return true;
+			//     }
+			//     throw new Error("Supervisor shouldn't be able to create an exchange");
+			// })
+			// it("User cannot create a Exchange", async () => {
+			//     const daoInstance = await getUserDao(owner);
+			//     try{
+			//         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:user});
+			//     }catch(_){
+			//         return true;
+			//     }
+			//     throw new Error("User shouldn't be able to create an exchange");
+			// })
+		})
 	})
 });

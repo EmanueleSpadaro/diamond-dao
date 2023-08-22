@@ -9,14 +9,6 @@ import {DaoPermissable} from "./DaoPermissable.sol";
 contract DaoFacet is IDao, DaoPermissable {
     using EnumerableSet for EnumerableSet.UintSet;
     //Modifier that allows to execute the code only if the caller IS a member
-    modifier isMember(address addr) {
-        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
-        require(
-            ds.usersRole[addr] != LibDao.DEFAULT_ADMIN_ROLE,
-            "you're required to be a member"
-        );
-        _;
-    }
 
     //Modifier that allows to execute the code only if the caller IS NOT a member
     modifier isNotMember(address addr) {
@@ -64,12 +56,6 @@ contract DaoFacet is IDao, DaoPermissable {
         require(_getRole(msg.sender) == role, "role not allowed");
         _;
     }
-
-    //TODO: move this logic into a DaoTokenFacet contract
-    // modifier canManageToken(string memory tokenSymbol) {
-    //     require(getTokenAuth(tokenSymbol, msg.sender), "not authorized to manage token");
-    //     _;
-    // }
 
     modifier isLegitRole(bytes32 role) {
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
@@ -318,7 +304,7 @@ contract DaoFacet is IDao, DaoPermissable {
         //Role -> NewRole -> AdminRole
 
         //We now add the given permissions
-        for(uint i = 0; i < perms.length; i++)
+        for (uint i = 0; i < perms.length; i++)
             _grantPermission(perms[i], newRole);
     }
 
@@ -469,6 +455,13 @@ contract DaoFacet is IDao, DaoPermissable {
 
     function getPermissionsCount() external pure returns (uint) {
         return uint(LibDao.DaoPermission.COUNT);
+    }
+
+    function getRolePermissions(
+        bytes32 role
+    ) external view returns (uint[] memory) {
+        LibDao.DaoStorage storage ds = LibDao.diamondStorage();
+        return ds.rolePermissions[role].permissions.values();
     }
 
     function hasPermission(
