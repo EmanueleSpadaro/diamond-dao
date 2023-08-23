@@ -69,6 +69,7 @@ describe("DiamondTest", async function () {
 	let moderator: HardhatEthersSigner;
 	let recipientUser: HardhatEthersSigner;
 	let crowdsaleID: HardhatEthersSigner; //FIXME: This MUST be an actual crowdsale address
+	let exchangeID: HardhatEthersSigner; //FIXME: This MUST be an actual crowdsale address
 	const supervisorPermissions: DaoPermission[] = [
 		DaoPermission.token_specific,
 		DaoPermission.token_transfer,
@@ -114,6 +115,7 @@ describe("DiamondTest", async function () {
 		daoExchangeFacet = await ethers.getContractAt("DaoExchangeFacet", diamondAddress);
 		const signers = await ethers.getSigners();
 		[factoryOwner, owner, admin, supervisor, user, moderator, recipientUser, crowdsaleID] = await ethers.getSigners();
+		exchangeID = crowdsaleID;
 	});
 
 	it("expected facets number -- call to facetAddresses function", async () => {
@@ -388,7 +390,7 @@ describe("DiamondTest", async function () {
 			})
 		})
 		describe("Crowdsale Permissions Grant/Revoke", () => {
-			
+
 			it("Owner grants/revokes to Supervisor", async () => {
 				assert.equal(await contractAs(daoCrowdsaleFacet, owner).getCrowdsaleManagement(crowdsaleID, supervisor), false, "Supervisor shouldn't have permissions for given crowdsale before assignment");
 				await contractAs(daoCrowdsaleFacet, owner).makeAdminCrowdsale(crowdsaleID, supervisor);
@@ -416,40 +418,123 @@ describe("DiamondTest", async function () {
 			})
 		})
 		describe("Exchange Create", () => {
-			// const coinsOffered = [];
-			// const coinsRequired = [];
-			// const amountsOffered = [];
-			// const amountsRequired = [];
-			// const repeats = 0;
-			// const expiration = 0;
+			//TODO: similiarly to test/tokens.ts, we might want to implement an interface for Exchanges
+			const coinsOffered: any[] = [];
+			const coinsRequired: any[] = [];
+			const amountsOffered: any[] = [];
+			const amountsRequired: any[] = [];
+			const repeats = 0;
+			const expiration = 0;
 			it("Owner can create a Exchange", async () => {
-				await contractAs(daoExchangeFacet, owner).createExchange();
-				await expect(contractAs(daoExchangeFacet, user).createExchange()).to.be.reverted;
+				await contractAs(daoExchangeFacet, owner).createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration);
+
 				// const daoInstance = await getUserDao(owner);
 				// await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:owner});
 			})
-			// it("Admin can create a Exchange", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:admin});
-			// })
-			// it("Supervisor cannot create a Exchange", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:supervisor});
-			//     }catch(_){
-			//         return true;
-			//     }
-			//     throw new Error("Supervisor shouldn't be able to create an exchange");
-			// })
-			// it("User cannot create a Exchange", async () => {
-			//     const daoInstance = await getUserDao(owner);
-			//     try{
-			//         await daoInstance.createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration, {from:user});
-			//     }catch(_){
-			//         return true;
-			//     }
-			//     throw new Error("User shouldn't be able to create an exchange");
-			// })
+			it("Admin can create a Exchange", async () => {
+				await contractAs(daoExchangeFacet, admin).createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration);
+			})
+			it("Supervisor cannot create a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, supervisor).createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration)).to.be.reverted;
+			})
+			it("User cannot create a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, user).createExchange(coinsOffered, coinsRequired, amountsOffered, amountsRequired, repeats, expiration)).to.be.reverted;
+			})
+		})
+		describe("Exchange Cancel", () => {
+			it("Owner can cancel a Exchange", async () => {
+				await contractAs(daoExchangeFacet, owner).cancelExchange(exchangeID);
+			})
+			it("Admin can cancel a Exchange", async () => {
+				await contractAs(daoExchangeFacet, admin).cancelExchange(exchangeID);
+			})
+			it("Supervisor cannot cancel a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, supervisor).cancelExchange(exchangeID)).to.be.reverted;
+			})
+			it("User cannot cancel a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, user).cancelExchange(exchangeID)).to.be.reverted;
+			})
+		})
+		describe("Exchange Renew", () => {
+			it("Owner can renew a Exchange", async () => {
+				await contractAs(daoExchangeFacet, owner).renewExchange(exchangeID, { from: owner });
+			})
+			it("Admin can renew a Exchange", async () => {
+				await contractAs(daoExchangeFacet, admin).renewExchange(exchangeID);
+			})
+			it("Supervisor cannot renew a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, supervisor).renewExchange(exchangeID)).to.be.reverted;
+			})
+			it("User cannot renew a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, user).renewExchange(exchangeID)).to.be.reverted;
+			})
+		})
+		describe("Exchange Accept", () => {
+			//TODO: similiarly to test/tokens.ts, we might want to implement an interface for Exchanges
+			const coinsRequired: any[] = [];
+			const coinsAmounts: any[] = [];
+			const repeats = 0;
+			it("Owner can accept a Exchange", async () => {
+				await contractAs(daoExchangeFacet, owner).acceptExchange(exchangeID, coinsRequired, coinsAmounts, repeats);
+			})
+			it("Admin can accept a Exchange", async () => {
+				await contractAs(daoExchangeFacet, admin).acceptExchange(exchangeID, coinsRequired, coinsAmounts, repeats);
+			})
+			it("Supervisor cannot accept a Exchange", async () => {
+				//FIXME: Tests says cannot, but previously written like it should be able to do so
+				await contractAs(daoExchangeFacet, supervisor).acceptExchange(exchangeID, coinsRequired, coinsAmounts, repeats);
+			})
+			it("User cannot accept a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, user).acceptExchange(exchangeID, coinsRequired, coinsAmounts, repeats)).to.be.reverted;
+			})
+		})
+		describe("Exchange Refill", () => {
+			const coinsOffered: any[] = [];
+			const coinsAmounts: any[] = [];
+			const repeats = 0;
+			it("Owner can refill a Exchange", async () => {
+				await contractAs(daoExchangeFacet, owner).refillExchange(exchangeID, coinsOffered, coinsAmounts, repeats);
+			})
+			it("Admin can refill a Exchange", async () => {
+				await contractAs(daoExchangeFacet, admin).refillExchange(exchangeID, coinsOffered, coinsAmounts, repeats);
+			})
+			it("Supervisor cannot refill a Exchange", async () => {
+				//FIXME: Tests says cannot, but previously written like it should be able to do so
+				await expect(contractAs(daoExchangeFacet, supervisor).refillExchange(exchangeID, coinsOffered, coinsAmounts, repeats));
+			})
+			it("User cannot refill a Exchange", async () => {
+				await expect(contractAs(daoExchangeFacet, user).refillExchange(exchangeID, coinsOffered, coinsAmounts, repeats)).to.be.reverted;
+			})
+		})
+		describe("Exchange Permissions Grant/Revoke", () => {
+			it("Owner grants/revokes to Supervisor", async () => {
+				assert.equal(await contractAs(daoExchangeFacet, owner).getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange before assignment");
+				await contractAs(daoExchangeFacet, owner).makeAdminExchange(exchangeID, supervisor, { from: owner });
+				assert.equal(await contractAs(daoExchangeFacet, owner).getExchangeManagement(exchangeID, supervisor), true, "Supervisor should have now permissions for given exchange");
+				await contractAs(daoExchangeFacet, owner).removeAdminExchange(exchangeID, supervisor, { from: owner });
+				assert.equal(await contractAs(daoExchangeFacet, owner).getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange");
+			})
+			it("Admin grants/revokes to Supervisor", async () => {
+				assert.equal(await contractAs(daoExchangeFacet, admin).getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange before assignment");
+				await contractAs(daoExchangeFacet, admin).makeAdminExchange(exchangeID, supervisor, { from: admin });
+				assert.equal(await contractAs(daoExchangeFacet, admin).getExchangeManagement(exchangeID, supervisor), true, "Supervisor should have now permissions for given exchange");
+				await contractAs(daoExchangeFacet, admin).removeAdminExchange(exchangeID, supervisor, { from: admin });
+				assert.equal(await contractAs(daoExchangeFacet, admin).getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange");
+			})
+			it("Supervisor cannot grant/revoke", async () => {
+				assert.equal(await daoExchangeFacet.getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange before assignment");
+				await expect(contractAs(daoExchangeFacet, supervisor).makeAdminExchange(exchangeID, supervisor)).to.be.reverted;
+				assert.equal(await daoExchangeFacet.getExchangeManagement(exchangeID, supervisor), false, "Supervisor shouldn't have permissions for given exchange");
+			})
+			it("User cannot grant/revoke", async () => {
+				assert.equal(await daoExchangeFacet.getExchangeManagement(exchangeID, user), false, "User shouldn't have permissions for given exchange before assignment");
+				await expect(contractAs(daoExchangeFacet, user).makeAdminExchange(exchangeID, user)).to.be.reverted;
+				assert.equal(await daoExchangeFacet.getExchangeManagement(exchangeID, user), false, "User shouldn't have permissions for given exchange");
+			})
+			it("User cannot receive exchange permissions", async () => {
+				await expect(contractAs(daoExchangeFacet, owner).makeAdminExchange(exchangeID, user)).to.be.reverted;
+				assert.equal(await daoExchangeFacet.getExchangeManagement(exchangeID, user), false, "User shouldn't have permissions for given exchange");
+			})
 		})
 	})
 });
