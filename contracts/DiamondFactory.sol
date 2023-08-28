@@ -3,16 +3,28 @@ pragma solidity ^0.8.18;
 
 import "./libraries/LibDao.sol";
 import "./Diamond.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract DiamondFactory {
-    address owner;
+contract DiamondFactory is OwnableUpgradeable {
     address diamondCutFacet;
     address[] otherFacets;
     string name;
     string realm;
 
-    constructor(string memory _factoryName, string memory _realm, address _diamondCutFacet, address[] memory _otherFacets) {
-        owner = msg.sender;
+    // constructor(
+    //     string memory _factoryName,
+    //     string memory _realm,
+    //     address _diamondCutFacet,
+    //     address[] memory _otherFacets
+    // ) {
+    //     owner = msg.sender;
+    //     diamondCutFacet = _diamondCutFacet;
+    //     name = _factoryName;
+    //     realm = _realm;
+    //     otherFacets = _otherFacets;
+    // }
+    function initialize(string memory _factoryName, string memory _realm, address _diamondCutFacet, address[] memory _otherFacets) initializer public {
+        __Ownable_init();
         diamondCutFacet = _diamondCutFacet;
         name = _factoryName;
         realm = _realm;
@@ -32,24 +44,17 @@ contract DiamondFactory {
         args.description_cid = _description_cid;
         args.isInviteOnly = false;
 
-
         Diamond diamond = new Diamond(address(this), diamondCutFacet, args);
         address newDaoAddress = address(diamond);
         return newDaoAddress;
     }
 
-
     function getCurrentFacets() external view returns (address[] memory) {
         address[] memory addresses = new address[](otherFacets.length + 1);
-        for(uint i = 0; i < otherFacets.length; i++){
-            addresses[i+1] = (otherFacets[i]);
+        for (uint i = 0; i < otherFacets.length; i++) {
+            addresses[i + 1] = (otherFacets[i]);
         }
         return addresses;
-    }
-
-       // Getter for owner
-    function getOwner() external view returns (address) {
-        return owner;
     }
 
     // Getter for diamondCutFacet

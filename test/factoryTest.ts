@@ -1,6 +1,6 @@
 /* global describe it before ethers */
 import { Contract } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import {
     getSelectors,
     FacetCutAction,
@@ -10,6 +10,7 @@ import {
 } from "../scripts/libraries/diamond";
 import { deployFacets } from "../scripts/libraries/diamondsFramework";
 import { assert } from "chai";
+
 
 
 describe("Diamond Factory Test", async () => {
@@ -29,9 +30,15 @@ describe("Diamond Factory Test", async () => {
         const diamondCut = await ethers.deployContract('DiamondCutFacet');
         await diamondCut.waitForDeployment();
         console.log(await diamondCut.getAddress());
+        const facetsAddresses: string[] = [];
+        for(const cc of deployedFacets){
+            facetsAddresses.push(await cc.getAddress())
+        }
+        
         
 
-        factory = await DiamondFactory.deploy("CommonsDAO Factory", "dao", diamondCut, deployedFacets);
+        factory = await upgrades.deployProxy(DiamondFactory, ["CommonsDAO Factory", "dao", await diamondCut.getAddress(), facetsAddresses])
+        //factory = await DiamondFactory.deploy("CommonsDAO Factory", "dao", diamondCut, deployedFacets);
     })
 
 
