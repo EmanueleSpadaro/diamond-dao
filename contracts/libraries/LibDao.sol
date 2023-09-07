@@ -13,6 +13,7 @@ library LibDao {
     bytes32 constant USER_ROLE = keccak256("USER_ROLE");
 
     struct DaoStorage {
+        address factory;
         address owner;
         string realm;
         string name;
@@ -79,6 +80,7 @@ library LibDao {
 
     function initDao(DaoConstructorArgs memory _args) internal {
         DaoStorage storage ds = diamondStorage();
+        ds.factory = msg.sender;
         ds.owner = _args.owner;
         ds.realm = _args.realm;
         ds.name = _args.name;
@@ -91,7 +93,9 @@ library LibDao {
         ds.roleHierarchy[USER_ROLE] = OWNER_ROLE;
 
         for (uint8 i = 0; i < uint8(DaoPermission.COUNT); i++) {
-            ds.rolePermissions[OWNER_ROLE].permissions.add(uint256(DaoPermission(i)));
+            ds.rolePermissions[OWNER_ROLE].permissions.add(
+                uint256(DaoPermission(i))
+            );
         }
     }
 
