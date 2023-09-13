@@ -270,9 +270,30 @@ contract DaoFacet is IDao, DaoPermissable {
         LibDao.DaoPermission perm,
         bytes32 toRole
     ) internal {
-        require(uint(perm) < uint(LibDao.DaoPermission.COUNT));
+        require(
+            toRole != LibDao.OWNER_ROLE &&
+                uint(perm) < uint(LibDao.DaoPermission.COUNT)
+        );
         LibDao.DaoStorage storage ds = LibDao.diamondStorage();
         ds.rolePermissions[toRole].permissions.remove(uint256(perm));
+    }
+
+    function grantPermissions(
+        LibDao.DaoPermission[] calldata perm,
+        bytes32 toRole
+    ) external onlyRole(LibDao.OWNER_ROLE) isLegitRole(toRole) {
+        for (uint i = 0; i < perm.length; i++) {
+            _grantPermission(perm[i], toRole);
+        }
+    }
+
+    function revokePermissions(
+        LibDao.DaoPermission[] calldata perm,
+        bytes32 toRole
+    ) external onlyRole(LibDao.OWNER_ROLE) isLegitRole(toRole)  {
+        for (uint i = 0; i < perm.length; i++) {
+            _revokePermission(perm[i], toRole);
+        }
     }
 
     //TODO: associate or atleast throw an event with the friendly name string of the rank?
