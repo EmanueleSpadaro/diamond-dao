@@ -19,6 +19,8 @@ contract DiamondFactory is OwnableUpgradeable {
     mapping(address => EnumerableSetUpgradeable.AddressSet) daosJoinedByUser;
     mapping(address => bool) isDao;
 
+
+
     IDiamondCut.FacetCut[] facetCuts;
 
     event DaoCreated(
@@ -29,6 +31,7 @@ contract DiamondFactory is OwnableUpgradeable {
     );
     event DaoJoined(address _daoJoined, address indexed _by);
     event DaoQuit(address _daoQuit, address indexed _by);
+    event DaoVersionReleased(IDiamondCut.FacetCut[] cuts);
 
 
     function initialize(
@@ -41,16 +44,22 @@ contract DiamondFactory is OwnableUpgradeable {
         diamondCutFacet = _diamondCutFacet;
         name = _factoryName;
         realm = _realm;
-        for (uint i = 0; i < _firstVersionCuts.length; i++) {
-            facetCuts.push(_firstVersionCuts[i]);
+        upgradeDaoVersion(_firstVersionCuts);
+    }
+
+    function upgradeDaoVersion(IDiamondCut.FacetCut[] calldata newVersionCuts) public {
+        delete facetCuts;
+        for (uint i = 0; i < newVersionCuts.length; i++) {
+            facetCuts.push(newVersionCuts[i]);
         }
+        emit DaoVersionReleased(newVersionCuts);
     }
 
     function createDao(
         string memory _name,
         string memory _firstlifePlaceID,
         string memory _description_cid
-    ) public {
+    ) public returns (address) {
         LibDao.DaoConstructorArgs memory args;
         args.owner = msg.sender;
         args.realm = realm;
@@ -70,6 +79,7 @@ contract DiamondFactory is OwnableUpgradeable {
         daosJoinedByUser[msg.sender].add(newDaoAddress);
         //DAO is now created, we emit its creation event
         emit DaoCreated(msg.sender, newDaoAddress, _name, _firstlifePlaceID);
+        return address(newDaoAddress);
     }
 
     function notifyUserQuit(address user) external onlyDao {
@@ -81,20 +91,6 @@ contract DiamondFactory is OwnableUpgradeable {
         daosJoinedByUser[user].add(msg.sender);
         emit DaoJoined(msg.sender, user);
     }
-
-
-    function getCurrentVersion() external pure returns (uint) {
-        return 0;
-    }
-
-
-    // function getCurrentFacets() external view returns (address[] memory) {
-    //     address[] memory addresses = new address[](otherFacets.length + 1);
-    //     for (uint i = 0; i < otherFacets.length; i++) {
-    //         addresses[i + 1] = (otherFacets[i]);
-    //     }
-    //     return addresses;
-    // }
 
     // Getter for diamondCutFacet
     function getDiamondCutFacevalues() external view returns (address) {

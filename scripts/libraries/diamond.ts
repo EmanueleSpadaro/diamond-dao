@@ -4,7 +4,7 @@ import {
 	ContractFactory,
 	FunctionFragment,
 	ethers,
-	
+
 } from "ethers";
 
 type Facets = { facetAddress: string; functionSelectors: string[] }[];
@@ -15,7 +15,15 @@ interface SelectorsObj extends Array<string> {
 	contract: Contract | ContractFactory<any[], BaseContract>;
 }
 
-export const FacetCutAction = { Add: 0, Replace: 1, Remove: 2 };
+export enum FacetCutAction { Add = 0, Replace = 1, Remove = 2 };
+
+export type FacetCutActionT = FacetCutAction.Add | FacetCutAction.Replace | FacetCutAction.Remove;
+
+export interface FacetCut {
+	facetAddress: string,
+	action: FacetCutActionT,
+	functionSelectors: SelectorsObj
+}
 
 // get function selectors from ABI
 export function getSelectors(
@@ -41,9 +49,12 @@ export function getSelectors(
 }
 
 // get function selector from function signature
-function getSelector(func: string): string | undefined {
+export function getSelector(func: string): string {
 	const abiInterface = new ethers.Interface([func]);
-	return abiInterface.getFunction(func)?.selector;
+	const selector = abiInterface.getFunction(func)?.selector;
+	if (selector === undefined)
+		throw new Error('getSelector unable to generate selector from signature => ' + func);
+	return selector;
 }
 
 // used with getSelectors to remove selectors from an array of selectors

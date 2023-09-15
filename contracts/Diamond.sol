@@ -16,6 +16,7 @@ contract Diamond {
     constructor(address _contractOwner, address _diamondCutFacet,
                 LibDao.DaoConstructorArgs memory args) payable {
 
+        //TODO: we might move this call into a DiamondInit contract, just in case
         // Initialize the Diamond DAO with the given arguments (owner, firstlife stuff, ...)
         LibDao.initDao(args);
         
