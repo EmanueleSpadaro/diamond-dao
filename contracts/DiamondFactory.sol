@@ -6,6 +6,7 @@ import "./Diamond.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol"; //for IDiamondCut.FacetCut
+
 contract DiamondFactory is OwnableUpgradeable {
     modifier onlyDao() {
         require(isDao[msg.sender], "only daos are allowed to call such method");
@@ -18,10 +19,15 @@ contract DiamondFactory is OwnableUpgradeable {
     mapping(string => address[]) placeDaos;
     mapping(address => EnumerableSetUpgradeable.AddressSet) daosJoinedByUser;
     mapping(address => bool) isDao;
-
-
-
-    IDiamondCut.FacetCut[] facetCuts;
+    uint public currentVersion;
+    IDiamondCut.FacetCut[] currentVersionCuts;
+    mapping(uint => mapping(uint => DaoVersionUpgradePathStruct))
+        public upgradePaths;
+    struct DaoVersionUpgradePathStruct {
+        uint fromVersion;
+        uint toVersion;
+        IDiamondCut.FacetCut[] upgradeCuts;
+    }
 
     event DaoCreated(
         address indexed _from,
@@ -31,8 +37,58 @@ contract DiamondFactory is OwnableUpgradeable {
     );
     event DaoJoined(address _daoJoined, address indexed _by);
     event DaoQuit(address _daoQuit, address indexed _by);
-    event DaoVersionReleased(IDiamondCut.FacetCut[] cuts);
 
+    event DaoVersionReleased(IDiamondCut.FacetCut[] cuts, uint indexed version);
+    event DaoUpgradeCutsReleased(
+        IDiamondCut.FacetCut[] upgradeCuts,
+        uint from,
+        uint to
+    );
+
+    function upgradeDaoVersion(
+        IDiamondCut.FacetCut[] calldata newVersionCuts
+    ) public onlyOwner {
+        delete currentVersionCuts;
+        for (uint i = 0; i < newVersionCuts.length; i++) {
+            currentVersionCuts.push(newVersionCuts[i]);
+        }
+        emit DaoVersionReleased(newVersionCuts, currentVersion++);
+    }
+
+    function upgradeDaoVersion(
+        IDiamondCut.FacetCut[] calldata newVersionCuts,
+        DaoVersionUpgradePathStruct[] calldata paths
+    ) public onlyOwner {
+        delete currentVersionCuts;
+        for (uint i = 0; i < newVersionCuts.length; i++) {
+            currentVersionCuts.push(newVersionCuts[i]);
+        }
+        emit DaoVersionReleased(newVersionCuts, currentVersion++);
+        setUpgradePaths(paths);
+    }
+
+    function setUpgradePaths(
+        DaoVersionUpgradePathStruct[] calldata paths
+    ) public onlyOwner {
+        for (uint i = 0; i < paths.length; i++) {
+            setUpgradePath(paths[i]);
+            emit DaoUpgradeCutsReleased(
+                paths[i].upgradeCuts,
+                paths[i].fromVersion,
+                paths[i].toVersion
+            );
+        }
+    }
+
+    function setUpgradePath(
+        DaoVersionUpgradePathStruct calldata path
+    ) internal {
+        uint from = path.fromVersion;
+        uint to = path.toVersion;
+        for (uint i = 0; i < path.upgradeCuts.length; i++) {
+            upgradePaths[from][to] = path;
+        }
+    }
 
     function initialize(
         string memory _factoryName,
@@ -45,14 +101,6 @@ contract DiamondFactory is OwnableUpgradeable {
         name = _factoryName;
         realm = _realm;
         upgradeDaoVersion(_firstVersionCuts);
-    }
-
-    function upgradeDaoVersion(IDiamondCut.FacetCut[] calldata newVersionCuts) public {
-        delete facetCuts;
-        for (uint i = 0; i < newVersionCuts.length; i++) {
-            facetCuts.push(newVersionCuts[i]);
-        }
-        emit DaoVersionReleased(newVersionCuts);
     }
 
     function createDao(
@@ -70,7 +118,11 @@ contract DiamondFactory is OwnableUpgradeable {
 
         Diamond diamond = new Diamond(address(this), diamondCutFacet, args);
         address newDaoAddress = address(diamond);
-        IDiamondCut(newDaoAddress).diamondCut(facetCuts, address(0), bytes(""));
+        IDiamondCut(newDaoAddress).diamondCut(
+            currentVersionCuts,
+            address(0),
+            bytes("")
+        );
         //We recognize this new DAO address as DAO in the future
         isDao[newDaoAddress] = true;
         //We add this dao address to the mapping of DAOs created in a specific firstlifeplaceID
@@ -107,11 +159,15 @@ contract DiamondFactory is OwnableUpgradeable {
         return realm;
     }
 
-    function getDaosJoinedBy(address user) external view returns (address[] memory) {
+    function getDaosJoinedBy(
+        address user
+    ) external view returns (address[] memory) {
         return daosJoinedByUser[user].values();
     }
 
-    function getPlaceDaos(string calldata firstlifePlaceID) external view returns (address[] memory) {
+    function getPlaceDaos(
+        string calldata firstlifePlaceID
+    ) external view returns (address[] memory) {
         return placeDaos[firstlifePlaceID];
     }
 
