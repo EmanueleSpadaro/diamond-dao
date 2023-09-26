@@ -21,7 +21,8 @@ contract DiamondFactory is OwnableUpgradeable {
 
 
 
-    IDiamondCut.FacetCut[] facetCuts;
+    uint public currentVersion;
+    IDiamondCut.FacetCut[] currentVersionFacetCuts;
 
     event DaoCreated(
         address indexed _from,
@@ -31,7 +32,7 @@ contract DiamondFactory is OwnableUpgradeable {
     );
     event DaoJoined(address _daoJoined, address indexed _by);
     event DaoQuit(address _daoQuit, address indexed _by);
-    event DaoVersionReleased(IDiamondCut.FacetCut[] cuts);
+    event DaoVersionReleased(uint version, IDiamondCut.FacetCut[] cuts);
 
 
     function initialize(
@@ -44,15 +45,16 @@ contract DiamondFactory is OwnableUpgradeable {
         diamondCutFacet = _diamondCutFacet;
         name = _factoryName;
         realm = _realm;
+        currentVersion = 0;
         upgradeDaoVersion(_firstVersionCuts);
     }
 
     function upgradeDaoVersion(IDiamondCut.FacetCut[] calldata newVersionCuts) public {
-        delete facetCuts;
+        delete currentVersionFacetCuts;
         for (uint i = 0; i < newVersionCuts.length; i++) {
-            facetCuts.push(newVersionCuts[i]);
+            currentVersionFacetCuts.push(newVersionCuts[i]);
         }
-        emit DaoVersionReleased(newVersionCuts);
+        emit DaoVersionReleased(++currentVersion, newVersionCuts);
     }
 
     function createDao(
@@ -70,7 +72,7 @@ contract DiamondFactory is OwnableUpgradeable {
 
         Diamond diamond = new Diamond(address(this), diamondCutFacet, args);
         address newDaoAddress = address(diamond);
-        IDiamondCut(newDaoAddress).diamondCut(facetCuts, address(0), bytes(""));
+        IDiamondCut(newDaoAddress).diamondCut(currentVersionFacetCuts, address(0), bytes(""));
         //We recognize this new DAO address as DAO in the future
         isDao[newDaoAddress] = true;
         //We add this dao address to the mapping of DAOs created in a specific firstlifeplaceID
@@ -117,5 +119,9 @@ contract DiamondFactory is OwnableUpgradeable {
 
     function isDaoAddress(address addr) external view returns (bool) {
         return isDao[addr];
+    }
+
+    function getCurrentVersionCuts() external view returns (IDiamondCut.FacetCut[] memory){
+        return currentVersionFacetCuts;
     }
 }
