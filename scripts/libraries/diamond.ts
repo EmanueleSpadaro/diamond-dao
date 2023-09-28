@@ -9,7 +9,7 @@ import {
 
 type Facets = { facetAddress: string; functionSelectors: string[] }[];
 
-interface SelectorsObj extends Array<string> {
+export interface SelectorsObj extends Array<string> {
 	get: typeof get;
 	remove: typeof remove;
 	contract: Contract | ContractFactory<any[], BaseContract>;
